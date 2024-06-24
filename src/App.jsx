@@ -1,6 +1,19 @@
 import { useState, useEffect } from "react";
-
+import md5 from "md5";
 import "./App.css";
+const baiduAppid = import.meta.env.VITE_BAIDU_APPID ?? 'default_appid';
+const baiduAPIkey = import.meta.env.VITE_BAIDU_APIKEY;
+
+function translateText(text, from , to) {
+  const salt = Math.random().toString(36).substring(2, 6);
+  const sign = md5(baiduAppid + text + salt + baiduAPIkey);
+  
+  const url = `/api/api/trans/vip/translate?q=${encodeURIComponent(text)}&from=${from}&to=${to}&appid=${baiduAppid}&salt=${salt}&sign=${sign}`;  
+  const result = fetch(url)
+          .then(response => response.json())
+          .then(data => data.trans_result[0].dst);
+  return result;
+} 
 
 function App() {
   // state variables
@@ -11,23 +24,23 @@ function App() {
 
   // fetch pokemon data when searchValue change
   useEffect(() => {
-    if (searchValue !== "") {
-      fetchPokemonImage(searchValue);
+    if (searchValue !== '') {
+      translateText(searchValue, 'auto', 'en')
+        .then(translatedName => {
+          const firstString = translatedName.split(' ')[0].toLowerCase();
+          return fetch(`https://pokeapi.co/api/v2/pokemon/${firstString}`);
+        })
+        .then(response => response.json())
+        .then(data => {
+          setImageURL(data.sprites.front_default);
+          setIsLoaded(true);
+        })
+        .catch(error => {
+          console.error('Error fetching Pokemon data:', error);
+          setIsLoaded(false);
+        });
     }
   }, [searchValue]);
-
-  const fetchPokemonImage = (pokemonName) => {
-    fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`)
-      .then((response) => response.json())
-      .then((data) => {
-        setImageURL(data.sprites.front_default);
-        setIsLoaded(true);
-      })
-      .catch((error) => {
-        console.error("Error fetching Pokemon data:", error);
-        setIsLoaded(false);
-      });
-  };
 
   const handleInputChange = (event) => {
     setCurrentValue(event.target.value);

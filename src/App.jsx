@@ -8,11 +8,11 @@ function App() {
   const [imageURL, setImageURL] = useState("");
   const [error, setError] = useState(null);
   const [pokeData, setPokeData] = useState({});
+  const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
     async function fetchAllPokemon() {
       try {
-        // 检查本地存储中是否有数据
         const storedData = localStorage.getItem('pokeData');
         if (storedData) {
           setPokeData(JSON.parse(storedData));
@@ -29,12 +29,10 @@ function App() {
           detailedData[speciesData.id] = {
             id: speciesData.id,
             names: speciesData.names,
-            // 添加其他需要的数据
           };
         }
 
         setPokeData(detailedData);
-        // 存储到本地存储
         localStorage.setItem('pokeData', JSON.stringify(detailedData));
       } catch (e) {
         console.error('Error fetching Pokemon data: ', e);
@@ -45,11 +43,14 @@ function App() {
 
   useEffect(() => {
     function searchPoke() {
+      console.log("Searching for: ", searchValue)
       if (searchValue !== '') {
         const pokeId = findPokeByName(searchValue);
+        console.log("poke Id: ", pokeId);
         if (pokeId) {
           setImageURL(getPokemonImageUrl(pokeId));
           setIsLoaded(true);
+          setError(null)
         } else {
           setError("Pokemon not found");
           setIsLoaded(false);
@@ -60,16 +61,17 @@ function App() {
   }, [searchValue, pokeData])
 
   function findPokeByName(name) {
+    
+    if (!isNaN(name) && pokeData[name]) {
+      return parseInt(name);
+    }
+
     const lowerName = name.toLowerCase();
     for (const id in pokeData) {
       const pokemon = pokeData[id];
       if (pokemon.names.some(n => n.name.toLowerCase() === lowerName)) {
         return pokemon.id;
       }
-    }
-    // 如果输入的是数字ID
-    if (!isNaN(name) && pokeData[name]) {
-      return parseInt(name);
     }
     return null;
   }
@@ -79,32 +81,84 @@ function App() {
   }
 
   const handleInputChange = (event) => {
-    setCurrentValue(event.target.value);
+    const value = event.target.value;
+    console.log("Input change to: ", value);
+    setCurrentValue(value);
+    updateSuggestions(value);
   };
 
   const handleKeyDown = (event) => {
     if (event.key === "Enter") {
       setSearchValue(currentValue);
+      setError(null);
+      setIsLoaded(false);
+      setSuggestions([]);
     }
   };
 
   const handleSearch = () => {
+    startNewSearch();
+  };
+
+  const startNewSearch = () => {
     setError(null);
     setIsLoaded(false);
     setSearchValue(currentValue);
+    setSuggestions([])
+  }
+
+  const handleSuggestionClick = (name) => {
+    console.log("Suggestion: ", name)
+    startNewSearch();
+    setSearchValue(name);
+    setCurrentValue(name);
+    setError(null);
+    setIsLoaded(false)
+  }
+
+  const updateSuggestions = (value) => {
+    if (value.length > 0) {
+      const lowerValue = value.toLowerCase();
+      const uniqueNames = new Set();
+      const suggestion = Object.values(pokeData)
+        .flatMap(pokemon => pokemon.names)
+        .filter(name => {
+          const lowerName = name.name.toLowerCase();
+          if (lowerName.startsWith(lowerValue) && !uniqueNames.has(lowerName)) {
+            uniqueNames.add(lowerName);
+            return true;
+          }
+          return false;
+        })
+        .slice(0, 5);
+      setSuggestions(suggestion);
+    } else {
+      setSuggestions([]);
+    }
   };
 
   return (
     <>
       <h1>Welcome to PokeSearch!!!</h1>
-      <span>Pokemon name: </span>
-      <input
-        value={currentValue}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Poke name or number"
-      />
-      <button onClick={handleSearch}>Search!</button>
+      <div className="search-container">
+        <span>Pokemon name: </span>
+        <input
+          value={currentValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Poke name or number"
+        />
+        <button onClick={handleSearch}>Search!</button>
+        {suggestions.length > 0 && (
+          <ul className="suggestions-list">
+            {suggestions.map((suggestion, index) => (
+              <li key={index} onClick={() => handleSuggestionClick(suggestion.name)}>
+                {suggestion.name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       {isLoaded && imageURL && (
         <img
           src={imageURL}
@@ -119,5 +173,6 @@ function App() {
     </>
   );
 }
+
 
 export default App;
